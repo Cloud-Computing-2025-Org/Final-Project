@@ -30,6 +30,15 @@ export default class BaseVisualization {
             .range([this.innerHeight, 0]);
     }
 
+    createTitle(titleName){
+        const title = this.svg.append('text')
+            .text(titleName)
+            .attr("font-size", "20px")
+            .attr('transform', `translate(${this.margin.left/2}, ${this.margin.top*1.25})`);
+        
+        return title;
+    }
+
     createLegend() {
         const legend = this.svg.append('g')
             .attr('class', 'legend')
