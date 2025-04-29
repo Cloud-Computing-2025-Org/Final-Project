@@ -14,7 +14,7 @@ export default class BaseVisualization {
         this.data = data;
         
         // Initialize margins
-        this.margin = { top: 20, right: 20, bottom: 30, left: 40 };
+        this.margin = { top: 20, right: 20, bottom: 20, left: 40 };
         this.innerWidth = this.width - this.margin.left - this.margin.right;
         this.innerHeight = this.height - this.margin.top - this.margin.bottom;
         
