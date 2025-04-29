@@ -85,7 +85,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const spinner = visDiv.querySelector(".vis-spinner");
                 
                 // Get container dimensions
-                const containerWidth = visDiv.clientWidth - (20 * 5); // remove padding
+                const containerWidth = visDiv.clientWidth; // remove padding
                 
                 // Create visualization instance
                 const VisClass = visualizationClasses[id];
@@ -95,36 +95,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     container: `#${id}`
                 });
 
-                // Add hover events
-                const rects = visDiv.querySelectorAll("rect");
-                addHoverEvents(rects);
-
                 // Clean up
                 spinner.remove();
             }
-        });
-    }
-
-    function addHoverEvents(rects) {
-        rects.forEach(rect => {
-            rect.addEventListener("mouseover", (e) => {
-                const tooltip = document.createElement("div");
-                tooltip.className = "tooltip";
-                tooltip.style.position = "absolute";
-                tooltip.style.background = "#fff";
-                tooltip.style.border = "1px solid #ccc";
-                tooltip.style.padding = "5px";
-                tooltip.style.pointerEvents = "none";
-                tooltip.style.left = `${e.pageX + 5}px`;
-                tooltip.style.top = `${e.pageY + 5}px`;
-                tooltip.innerHTML = `Value: ${rect.getAttribute("data-id")}`;
-                document.body.appendChild(tooltip);
-            });
-            
-            rect.addEventListener("mouseout", () => {
-                const tooltip = document.querySelector(".tooltip");
-                if (tooltip) tooltip.remove();
-            });
         });
     }
 });

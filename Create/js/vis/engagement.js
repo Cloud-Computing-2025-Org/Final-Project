@@ -4,34 +4,83 @@ export default class EngagementVisualization extends BaseVisualization {
     constructor(data, options = {}) {
         super(data, options);
         
-        // Set up scales
-        this.xScale.domain([
-            d3.min(data, d => d.WEEK_NUM),
-            d3.max(data, d => d.WEEK_NUM)
-        ]);
+        // Create scales for dual axes
+        const xDomain = data.map(d => `${d.YEAR}-${d.WEEK_NUM}`);
+        this.xScale.domain(xDomain);
         
-        this.yScale.domain([
-            0,
-            Math.max(
-                d3.max(data, d => d.total_spend),
-                d3.max(data, d => d.unique_households)
-            ) * 1.1
-        ]);
+        // Separate y-scales for spend and households
+        this.spendYScale = d3.scaleLinear()
+            .domain([0, d3.max(data, d => d.total_spend) * 1.1])
+            .range([this.height - this.margin.bottom, this.margin.top]);
+            
+        this.householdsYScale = d3.scaleLinear()
+            .domain([0, d3.max(data, d => d.unique_households) * 1.1])
+            .range([this.height - this.margin.bottom, this.margin.top]);
 
-        // Create lines
+        // Create axes
+        this.createAxes();
         this.createLines();
         this.createLegend();
     }
 
+    createAxes() {
+        // X-axis with combined week/year labels
+        const xAxis = d3.axisBottom(this.xScale)
+            .tickFormat((d) => {
+                const [year, week] = d.split('-');
+                return `${week} (${year})`;
+            })
+            .ticks(10); // Adjust number of ticks based on data density
+
+        // Y-axis for spend (left)
+        const spendYAxis = d3.axisLeft(this.spendYScale)
+            .tickFormat(d3.format(",.0f"));
+
+        // Y-axis for households (right)
+        const householdsYAxis = d3.axisRight(this.householdsYScale)
+            .tickFormat(d3.format(",.0f"));
+
+        // Add axes to SVG
+        this.plotGroup.append('g')
+            .attr('class', 'axis x-axis')
+            .attr('transform', `translate(0,${this.height - this.margin.bottom})`)
+            .call(xAxis);
+
+        this.plotGroup.append('g')
+            .attr('class', 'axis y-axis spend-axis')
+            .attr('transform', `translate(${this.margin.left},0)`)
+            .call(spendYAxis);
+
+        this.plotGroup.append('g')
+            .attr('class', 'axis y-axis household-axis')
+            .attr('transform', `translate(${this.width - this.margin.right*2},0)`)
+            .call(householdsYAxis);
+
+        // Add axis labels
+        this.plotGroup.append('text')
+            .attr('transform', `translate(${-this.margin.left},0)rotate(-90)`)
+            .attr('y', 6)
+            .attr('dy', '.71em')
+            .style('text-anchor', 'end')
+            .text('Total Spend');
+
+        this.plotGroup.append('text')
+            .attr('transform', `translate(${this.width - this.margin.right},0)rotate(90)`)
+            .attr('y', -6)
+            .attr('dy', '.71em')
+            .style('text-anchor', 'end')
+            .text('Unique Households');
+    }
+
     createLines() {
-        // Line generators
+        // Line generators with separate y-scales
         const spendLine = d3.line()
-            .x(d => this.xScale(d.WEEK_NUM))
-            .y(d => this.yScale(d.total_spend));
+            .x((d) => this.xScale(`${d.YEAR}-${d.WEEK_NUM}`))
+            .y((d) => this.spendYScale(d.total_spend));
 
         const householdsLine = d3.line()
-            .x(d => this.xScale(d.WEEK_NUM))
-            .y(d => this.yScale(d.unique_households));
+            .x((d) => this.xScale(`${d.YEAR}-${d.WEEK_NUM}`))
+            .y((d) => this.householdsYScale(d.unique_households));
 
         // Add lines to plot
         this.plotGroup.append('path')
@@ -53,14 +102,12 @@ export default class EngagementVisualization extends BaseVisualization {
 
     createLegend() {
         const legend = super.createLegend();
-
-        // Legend items
+        
         const legendItems = [
             { label: 'Total Spend', color: '#FF6B6B' },
             { label: 'Unique Households', color: '#4ECDC4' }
         ];
 
-        // Create legend entries
         legend.selectAll('.legend-item')
             .data(legendItems)
             .enter()
@@ -68,7 +115,6 @@ export default class EngagementVisualization extends BaseVisualization {
             .attr('class', 'legend-item')
             .attr('transform', (d, i) => `translate(0, ${i * 25})`);
 
-        // Add legend circles and text
         legend.selectAll('.legend-item')
             .append('circle')
             .attr('cx', 0)
