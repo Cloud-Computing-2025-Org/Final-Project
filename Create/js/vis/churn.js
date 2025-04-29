@@ -4,83 +4,109 @@ export default class ChurnVisualization extends BaseVisualization {
     constructor(data, options = {}) {
         super(data, options);
         
-        // Set up scales
-        this.xScale.domain([
-            d3.min(data, d => d.WEEK_NUM),
-            d3.max(data, d => d.WEEK_NUM)
-        ]);
+        // Convert dates to days since first purchase
+        const parseDate = d3.timeParse("%d-%b-%y");
+        const formatDate = d3.timeFormat("%d-%b-%y");
         
-        this.yScale.domain([
-            0,
-            Math.max(
-                d3.max(data, d => d.total_spend),
-                d3.max(data, d => d.unique_households)
-            ) * 1.1
-        ]);
+        // Transform data for regression
+        this.transformedData = this.data.map(d => ({
+            x: Date.parse(parseDate(d.last_purchase_date)) / (1000 * 60 * 60 * 24),
+            y: d.HSD_NUM
+        }));
 
-        // Create lines
-        this.createLines();
-        this.createLegend();
+        // Calculate regression
+        const regression = this.calculateRegression();
+        
+        // Set domains based on regression
+        this.xScale.domain(d3.extent(this.transformedData, d => d.x));
+        this.yScale.domain(d3.extent(this.transformedData, d => d.y));
+
+        // Create axes with meaningful labels
+        this.createAxes("Days Since First Purchase", "Churn Score");
+
+        // Add points
+        this.plotPoints();
+        
+        // Add regression line
+        this.addRegressionLine(regression);
+        
+        // Add prediction line
+        this.addPredictionLine(regression);
+
+        // Add title
+        this.createTitle("Churn Predicition")
     }
 
-    createLines() {
-        // Line generators
-        const spendLine = d3.line()
-            .x(d => this.xScale(d.WEEK_NUM))
-            .y(d => this.yScale(d.total_spend));
+    calculateRegression() {
+        const xValues = this.transformedData.map(d => d.x);
+        const yValues = this.transformedData.map(d => d.y);
 
-        const householdsLine = d3.line()
-            .x(d => this.xScale(d.WEEK_NUM))
-            .y(d => this.yScale(d.unique_households));
+        let sum_x = 0;
+        let sum_y = 0;
+        let sum_xy = 0;
+        let sum_xx = 0;
+        let n = xValues.length;
 
-        // Add lines to plot
-        this.plotGroup.append('path')
-            .datum(this.data)
-            .attr('class', 'line spend-line')
-            .attr('fill', 'none')
-            .attr('stroke', '#FF6B6B') // Red
-            .attr('stroke-width', 2)
-            .attr('d', spendLine);
+        for (let i = 0; i < n; i++) {
+            sum_x += xValues[i];
+            sum_y += yValues[i];
+            sum_xy += xValues[i] * yValues[i];
+            sum_xx += xValues[i] * xValues[i];
+        }
 
-        this.plotGroup.append('path')
-            .datum(this.data)
-            .attr('class', 'line household-line')
-            .attr('fill', 'none')
-            .attr('stroke', '#4ECDC4') // Teal
-            .attr('stroke-width', 2)
-            .attr('d', householdsLine);
+        const slope = (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x);
+        const intercept = (sum_y - slope * sum_x) / n;
+
+        return { slope, intercept };
     }
 
-    createLegend() {
-        const legend = super.createLegend();
-
-        // Legend items
-        const legendItems = [
-            { label: 'Total Spend', color: '#FF6B6B' },
-            { label: 'Unique Households', color: '#4ECDC4' }
-        ];
-
-        // Create legend entries
-        legend.selectAll('.legend-item')
-            .data(legendItems)
+    plotPoints() {
+        this.plotGroup.selectAll("circle")
+            .data(this.transformedData)
             .enter()
-            .append('g')
-            .attr('class', 'legend-item')
-            .attr('transform', (d, i) => `translate(0, ${i * 25})`);
+            .append("circle")
+            .attr("cx", d => this.xScale(d.x))
+            .attr("cy", d => this.yScale(d.y))
+            .attr("r", 5)
+            .attr("fill", "#2196F3");
+    }
 
-        // Add legend circles and text
-        legend.selectAll('.legend-item')
-            .append('circle')
-            .attr('cx', 0)
-            .attr('cy', 0)
-            .attr('r', 5)
-            .attr('fill', d => d.color);
+    addRegressionLine(regression) {
+        const line = d3.line()
+            .x(d => this.xScale(d.x))
+            .y(d => this.yScale(regression.slope * d.x + regression.intercept));
 
-        legend.selectAll('.legend-item')
-            .append('text')
-            .attr('x', 10)
-            .attr('y', 5)
-            .attr('font-size', '12px')
-            .text(d => d.label);
+        this.plotGroup.append("path")
+            .datum(this.transformedData)
+            .attr("class", "regression-line")
+            .attr("fill", "none")
+            .attr("stroke", "#FF5722")
+            .attr("stroke-width", 2)
+            .attr("d", line);
+    }
+
+    addPredictionLine(regression) {
+        const futureDays = 30; // Predict next 30 days
+        const lastDate = Math.max(...this.transformedData.map(d => d.x));
+        const predictionPoint = {
+            x: lastDate + (futureDays * 24 * 60 * 60),
+            y: regression.slope * (lastDate + (futureDays * 24 * 60 * 60)) + regression.intercept
+        };
+
+        this.plotGroup.append("line")
+            .attr("class", "prediction-line")
+            .attr("x1", this.xScale(lastDate))
+            .attr("y1", this.yScale(regression.slope * lastDate + regression.intercept))
+            .attr("x2", this.xScale(predictionPoint.x))
+            .attr("y2", this.yScale(predictionPoint.y))
+            .attr("stroke", "#FF5722")
+            .attr("stroke-dasharray", "5,5")
+            .attr("opacity", 0.7);
+
+        this.plotGroup.append("circle")
+            .attr("cx", this.xScale(predictionPoint.x))
+            .attr("cy", this.yScale(predictionPoint.y))
+            .attr("r", 6)
+            .attr("fill", "#FF5722");
     }
 }
