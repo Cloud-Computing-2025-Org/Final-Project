@@ -7,7 +7,6 @@ import urllib
 from models import db
 from routes import routes
 import pandas as pd
-import urllib.parse
 
 
 # Initialize Flask app
