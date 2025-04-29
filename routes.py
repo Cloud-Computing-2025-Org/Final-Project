@@ -4,6 +4,7 @@ from sqlalchemy import text
 from models import db
 from decorators import require_cookie
 import time
+import pandas as pd
 
 routes = Blueprint('routes', __name__)
 
