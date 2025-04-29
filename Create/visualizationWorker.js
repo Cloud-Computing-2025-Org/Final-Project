@@ -38,152 +38,220 @@ self.onmessage = function(event) {
 
 // Base class modifications
 class BaseVisualization {
-  constructor(width = 600, height = 400, margin = { top: 20, right: 30, bottom: 30, left: 60 }) {
-      this.width = width;
-      this.height = height;
-      this.margin = margin;
-      this.svgWidth = width + margin.left + margin.right;
-      this.svgHeight = height + margin.top + margin.bottom;
-      this.innerWidth = width - margin.left - margin.right;
-      this.innerHeight = height - margin.top - margin.bottom;
-      // Initialize D3 scales
-      this.xScale = null;
-      this.yScale = null;
-  }
+    constructor(width = 600, height = 400, margin = { top: 20, right: 30, bottom: 30, left: 60 }) {
+        this.width = width;
+        this.height = height;
+        this.margin = margin;
+        this.svgWidth = width + margin.left + margin.right;
+        this.svgHeight = height + margin.top + margin.bottom;
+        this.innerWidth = width - margin.left - margin.right;
+        this.innerHeight = height - margin.top - margin.bottom;
+        // Initialize D3 scales
+        this.xScale = null;
+        this.yScale = null;
+    }
 
-  generateSVG() {
-      return `<svg width="${this.svgWidth}" height="${this.svgHeight}">
-              <g transform="translate(${this.margin.left},${this.margin.top})">`;
-  }
+    generateSVG() {
+        return `<svg width="${this.svgWidth}" height="${this.svgHeight}">
+                <g transform="translate(${this.margin.left},${this.margin.top})">`;
+    }
 
-  addAxes(xAxis, yAxis) {
-      const axes = `
-          <g transform="translate(0,${this.innerHeight})">
-              ${d3.axisBottom(xAxis)}
-          </g>
-          <g transform="translate(-25,0)">
-              ${d3.axisLeft(yAxis)}
-          </g>`;
-      return axes;
-  }
+    addAxes(xAxis, yAxis) {
+        const axes = `
+            <g transform="translate(0,${this.innerHeight})">
+                ${d3.axisBottom(xAxis)}
+            </g>
+            <g transform="translate(-25,0)">
+                ${d3.axisLeft(yAxis)}
+            </g>`;
+        return axes;
+    }
 
-  addLegend(items, x, y) {
-      const legendItems = items.map((item, i) => `
-          <rect x="${x}" y="${y + i * 25}" width="15" height="15" fill="${item.color}"/>
-          <text x="${x + 20}" y="${y + i * 25 + 13}" font-size="12">${item.label}</text>
-      `).join('');
-      return legendItems;
-  }
+    addLegend(items, x, y) {
+        const legendItems = items.map((item, i) => `
+            <rect x="${x}" y="${y + i * 25}" width="15" height="15" fill="${item.color}"/>
+            <text x="${x + 20}" y="${y + i * 25 + 13}" font-size="12">${item.label}</text>
+        `).join('');
+        return legendItems;
+    }
 }
 
 class EngagementVisualization extends BaseVisualization {
-  constructor(data) {
-      super(data.width);
-      this.data = data;
-  }
+    constructor(data) {
+        super(data.width);
+        this.data = data;
+        // Initialize scales
+        this.xScale = d3.scaleTime()
+            .range([0, this.innerWidth]);
+            
+        this.yScaleSpend = d3.scaleLinear()
+            .range([this.innerHeight, 0]);
+            
+        this.yScaleHouseholds = d3.scaleLinear()
+            .range([this.innerHeight, 0]);
+    }
 
-  generateSVG() {
-      // Create scales
-      const xScale = d3.scaleBand()
-          .domain(this.data.map(d => d.date))
-          .range([0, this.innerWidth])
-          .padding(0.1);
+    generateSVG() {
+        const data = this.data
+        // Set domains
+        this.xScale.domain(d3.extent(data, d => new Date(d.YEAR, d.WEEK_NUM)));
+        this.yScaleSpend.domain([0, d3.max(data, d => d.total_spend)]);
+        this.yScaleHouseholds.domain([0, d3.max(data, d => d.unique_households)]);
 
-      const yScale = d3.scaleLinear()
-          .domain([0, d3.max(this.data, d => d.total_spend)])
-          .range([this.innerHeight, 0]);
+        // Create SVG string
+        let svgString = super.generateSVG();
 
-      // Generate SVG content
-      let svgContent = super.generateSVG();
+        // Add axes
+        svgString += this.addAxes(
+            d3.axisBottom(this.xScale),
+            d3.axisLeft(this.yScaleSpend)
+        );
 
-      // Add bars
-      svgContent += this.data.map((d, i) => {
-          const x = xScale(d.date);
-          const barHeight = (d.total_spend / Math.max(...this.data.map(d => d.total_spend))) * this.innerHeight;
-          return `<rect x="${x}" y="${this.innerHeight - barHeight}" 
-                  width="${xScale.bandwidth()}" height="${barHeight}" 
-                  fill="steelblue"/>`;
-      }).join('');
+        // Add lines
+        const lineGenSpend = d3.line()
+            .x(d => this.xScale(new Date(d.YEAR, d.WEEK_NUM)))
+            .y(d => this.yScaleSpend(d.total_spend));
 
-      // Add axes
-      svgContent += this.addAxes(
-          d3.axisBottom(xScale),
-          d3.axisLeft(yScale)
-      );
+        const lineGenHouseholds = d3.line()
+            .x(d => this.xScale(new Date(d.YEAR, d.WEEK_NUM)))
+            .y(d => this.yScaleHouseholds(d.unique_households));
 
-      // Close SVG
-      svgContent += '</g></svg>';
-      return svgContent;
-  }
+        svgString += `
+            <path class="line spend-line"
+                d="${lineGenSpend(data)}"
+                fill="none"
+                stroke="#ff7f0e"
+                stroke-width="2"/>
+            <path class="line household-line"
+                d="${lineGenHouseholds(data)}"
+                fill="none"
+                stroke="#1f77b4"
+                stroke-width="2"/>
+        `;
+
+        // Add legend
+        svgString += this.addLegend(
+            [
+                { color: "#ff7f0e", label: "Total Spend" },
+                { color: "#1f77b4", label: "Unique Households" }
+            ],
+            this.innerWidth - 120,
+            20
+        );
+
+        // Close SVG
+        svgString += '</g></svg>';
+
+        return svgString;
+    }
+
+    exportSVG(data) {
+        const svgString = this.generateSVG(data);
+        
+        // Create blob and download
+        const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const downloadLink = document.createElement("a");
+        downloadLink.href = url;
+        downloadLink.download = "engagement-visualization.svg";
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+    }
 }
 
 class DemographicsVisualization extends BaseVisualization {
-  constructor(data) {
-      super(data.width);
-      this.data = data;
-  }
+    constructor(data) {
+        super(data.width);
+        this.data = data;
+    }
 
-  generateSVG() {
-      // Process data
-      const processedData = this.data.reduce((acc, item) => {
-          const ageGroup = item.AGE_RANGE.trim();
-          acc[ageGroup] = acc[ageGroup] || { ageGroup, values: [] };
-          acc[ageGroup].values.push({
-              loyalty: item.L === 'Y',
-              spend: parseFloat(item.avg_spend)
-          });
-          return acc;
-      }, {});
+    generateSVG() {
+        // Process data
+        const processedData = this.data.reduce((acc, item) => {
+            const ageGroup = item.AGE_RANGE.trim();
+            acc[ageGroup] = acc[ageGroup] || { ageGroup, values: [] };
+            acc[ageGroup].values.push({
+                loyalty: item.L === 'Y',
+                spend: parseFloat(item.avg_spend)
+            });
+            return acc;
+        }, {});
 
-      const seriesData = Object.entries(processedData).map(([ageGroup, data]) => ({
-          ageGroup,
-          avgSpend: d3.mean(data.values, d => d.spend),
-          loyaltyRate: (data.values.filter(d => d.loyalty).length / data.values.length) * 100
-      }));
+        const seriesData = Object.entries(processedData).map(([ageGroup, data]) => ({
+            ageGroup,
+            avgSpend: d3.mean(data.values, d => d.spend),
+            loyaltyRate: (data.values.filter(d => d.loyalty).length / data.values.length) * 100
+        }));
 
-      // Create scales
-      const xScale = d3.scaleBand()
-          .domain(seriesData.map(d => d.ageGroup))
-          .range([0, this.innerWidth])
-          .padding(0.3);
+        // Create scales
+        const xScale = d3.scaleBand()
+            .domain(seriesData.map(d => d.ageGroup))
+            .range([0, this.innerWidth])
+            .padding(0.3);
 
-      const yScale = d3.scaleLinear()
-          .domain([0, d3.max(seriesData, d => Math.max(d.avgSpend, d.loyaltyRate))])
-          .range([this.innerHeight, 0]);
+        // Adjust y-scale domain to account for both metrics
+        const maxDomainValue = d3.max(seriesData, d => Math.max(d.avgSpend, d.loyaltyRate));
+        const yScale = d3.scaleLinear()
+            .domain([0, maxDomainValue * 1.1]) // Add 10% padding
+            .range([this.innerHeight, 0]);
 
-      // Generate SVG content
-      let svgContent = super.generateSVG();
+        // Generate SVG content
+        let svgContent = super.generateSVG();
 
-      // Add spend bars
-      svgContent += seriesData.map((d, i) => {
-          return `<rect x="${xScale(d.ageGroup)}" y="${yScale(d.avgSpend)}"
-                   width="${xScale.bandwidth()}" height="${this.innerHeight - yScale(d.avgSpend)}"
-                   fill="#2196F3"/>`;
-      }).join('');
+        // Add spend bars
+        svgContent += seriesData.map((d, i) => {
+            return `<rect x="${xScale(d.ageGroup)}" y="${yScale(d.avgSpend)}"
+                    width="${xScale.bandwidth()}" height="${this.innerHeight - yScale(d.avgSpend)}"
+                    fill="#2196F3"/>`;
+        }).join('');
 
-      // Add loyalty rate bars
-      svgContent += seriesData.map((d, i) => {
-          return `<rect x="${xScale(d.ageGroup) + xScale.bandwidth()/2 - 20}" 
-                       y="${yScale(d.loyaltyRate)}" width="40" height="${this.innerHeight - yScale(d.loyaltyRate)}"
-                       fill="#FF5722"/>`;
-      }).join('');
+        // Add loyalty rate bars with proper positioning
+        svgContent += seriesData.map((d, i) => {
+            const barWidth = xScale.bandwidth() / 2;
+            const offset = barWidth + (barWidth / 2);
+            return `<rect x="${xScale(d.ageGroup) + offset}" y="${yScale(d.loyaltyRate)}"
+                    width="${barWidth}" height="${this.innerHeight - yScale(d.loyaltyRate)}"
+                    fill="#FF5722"/>`;
+        }).join('');
 
-      // Add axes
-      svgContent += this.addAxes(
-          d3.axisBottom(xScale),
-          d3.axisLeft(yScale)
-      );
+        // Add axes// Add axes with labels
+        svgContent += this.addAxes(
+            d3.axisBottom(xScale),
+            d3.axisLeft(yScale)
+        );
 
-      // Add legend
-      svgContent += this.addLegend([
-          { color: '#2196F3', label: 'Average Spend' },
-          { color: '#FF5722', label: 'Loyalty Rate' }
-      ], this.innerWidth - 150, 30);
+        // Add axis labels
+        svgContent += `
+            <!-- X-axis label -->
+            <text
+                transform="translate(${this.innerWidth/2},${this.innerHeight + 25})"
+                style="text-anchor: middle;"
+                class="axis-label"
+            >
+                Age Group
+            </text>
+            
+            <!-- Y-axis label -->
+            <text
+                transform="rotate(-90)"
+                transform-origin="${this.innerHeight/2}px ${this.margin.left - 10}px"
+                style="text-anchor: middle;"
+                class="axis-label"
+            >
+                Average Spend/Loyalty Rate (%)
+            </text>
+        `;
+        // Add legend
+        svgContent += this.addLegend([
+            { color: '#2196F3', label: 'Average Spend' },
+            { color: '#FF5722', label: 'Loyalty Rate' }
+        ], this.innerWidth - 150, 30);
 
-      // Close SVG
-      svgContent += '</g></svg>';
-      return svgContent;
-  }
+        // Close SVG
+        svgContent += '</g></svg>';
+        return svgContent;
+    }
 }
 
 class SegmentationVisualization extends BaseVisualization {

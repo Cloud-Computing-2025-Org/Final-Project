@@ -169,7 +169,7 @@
           const worker = new Worker("/static/visualizationWorker.js");
           // Get the one of the vis container's width
           const container = document.getElementById('engagement');
-          const containerWidth = container.clientWidth;
+          const containerWidth = container.clientWidth - (20*5); // remove padding
           const dataToSend = data[id];
           dataToSend.width = containerWidth;
           worker.postMessage({ id, data: dataToSend });
