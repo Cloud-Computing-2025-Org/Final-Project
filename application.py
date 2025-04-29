@@ -6,6 +6,9 @@ import os
 import urllib
 from models import db
 from routes import routes
+import pandas as pd
+import urllib.parse
+
 
 # Initialize Flask app
 app = Flask(__name__, static_folder='Create')
@@ -20,12 +23,13 @@ load_dotenv()
 
 # Create URL object with driver specification
 connection_url = URL.create(
-    "mssql+pyodbc",
-    query={
-        "odbc_connect": os.environ["SQLAZURECONNSTR_AZURE_SQL_CONNECTIONSTRING"],
-        "driver": "ODBC Driver 18 for SQL Server"
-    }
-)
+     "mssql+pyodbc",
+     query={
+         "odbc_connect": os.environ["SQLAZURECONNSTR_AZURE_SQL_CONNECTIONSTRING"],
+         "driver": "ODBC Driver 18 for SQL Server"
+     }
+ )
+
 
 # Configure Flask-SQLAlchemy
 app.config['SQLALCHEMY_DATABASE_URI'] = str(connection_url)
