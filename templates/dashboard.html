@@ -167,7 +167,12 @@
           visDiv.appendChild(progressBar);
 
           const worker = new Worker("/static/visualizationWorker.js");
-          worker.postMessage({ id, data: data[id] });
+          // Get the one of the vis container's width
+          const container = document.getElementById('engagement');
+          const containerWidth = container.clientWidth;
+          const dataToSend = data[id];
+          dataToSend.width = containerWidth;
+          worker.postMessage({ id, data: dataToSend });
 
           worker.onmessage = (event) => {
             const { progress, svgContent } = event.data;
