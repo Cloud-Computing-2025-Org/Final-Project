@@ -229,29 +229,42 @@ def reload_data():
         return f"<h1>Reload Failed ❌</h1><p>Error: {str(e)}</p>"
 
 @routes.route("/search", methods=["GET", "POST"])
+@routes.route("/search-autocomplete", methods=["GET"])
 @require_cookie
 def search():
-    results = []
+    rows = None
     columns = []
     
+    if request.path == "/search-autocomplete":
+        term = request.args.get('term', '')
+        query = text("""
+            SELECT DISTINCT HSHD_NUM 
+            FROM transactions 
+            WHERE CAST(HSHD_NUM AS VARCHAR(50)) LIKE :term
+            ORDER BY HSHD_NUM
+            OFFSET 0 ROWS
+            FETCH NEXT 10 ROWS ONLY
+        """)
+        results = db.session.execute(query, {'term': f'%{term}%'})
+        return jsonify([row[0] for row in results])
+        
     if request.method == "POST":
         hshd_num = request.form.get("hshd")
         if hshd_num:
             query = text("""
-                SELECT t.HSHD_NUM, t.BASKET_NUM, t.PURCHASE_, t.PRODUCT_NUM, 
+                SELECT t.HSHD_NUM, t.BASKET_NUM, t.PURCHASE_, t.PRODUCT_NUM,
                        p.DEPARTMENT, p.COMMODITY
                 FROM transactions t
                 JOIN products p ON t.PRODUCT_NUM = p.PRODUCT_NUM
                 WHERE t.HSHD_NUM = :hshd
-                ORDER BY t.HSHD_NUM, t.BASKET_NUM, t.PURCHASE_, t.PRODUCT_NUM, 
-                       p.DEPARTMENT, p.COMMODITY
+                ORDER BY t.HSHD_NUM, t.BASKET_NUM, t.PURCHASE_, t.PRODUCT_NUM,
+                         p.DEPARTMENT, p.COMMODITY
             """)
-            
             results = db.session.execute(query, {"hshd": int(hshd_num)})
             columns = [desc[0] for desc in results.cursor.description]
-            return render_template("search.html", rows=results.fetchall(), columns=columns)
-    
-    return render_template("search.html")
+            rows = results.fetchall()
+            
+    return render_template("search.html", rows=rows, columns=columns)
 
 @routes.route("/demographics")
 @require_cookie

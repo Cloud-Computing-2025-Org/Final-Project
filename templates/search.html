@@ -1,22 +1,156 @@
-<form method="POST">
-    <label>Enter Household Number:</label>
-    <input name="hshd" type="text" required>
-    <button type="submit">Search</button>
+<!DOCTYPE html>
+<html>
+<head>
+<title>Household Search</title>
+<link href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css" rel="stylesheet">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+<style>
+table {
+    margin-top: 20px;
+    border-collapse: collapse;
+    width: 100%;
+}
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+th {
+    background-color: #f2f2f2;
+    cursor: pointer;
+    position: relative;
+}
+th:hover {
+    background-color: #e2e2e2;
+}
+th::after {
+    content: '';
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-style: solid;
+    border-width: 4px 4px 0;
+    border-color: transparent transparent #333;
+}
+th.desc::after {
+    border-width: 0 4px 4px;
+    border-color: transparent transparent #333;
+}
+th.asc::after {
+    border-width: 4px 4px 0;
+    border-color: #333 transparent transparent;
+}
+.invalid {
+    border-color: #ff0000;
+}
+button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+</style>
+</head>
+<body>
+<a href="./">< Back</a>
+<br>
+<form method="POST" id="searchForm">
+<label>Enter Household Number:</label>
+<input name="hshd" type="text" required
+    class="form-control" id="household-number">
+<button type="submit" id="searchButton">Search</button>
 </form>
-
 {% if rows %}
-    <table border="1">
-        <tr>
-            {% for col in rows[0].keys() %}
-            <th>{{ col }}</th>
-            {% endfor %}
-        </tr>
-        {% for row in rows %}
-        <tr>
-            {% for cell in row %}
-            <td>{{ cell }}</td>
-            {% endfor %}
-        </tr>
-        {% endfor %}
-    </table>
+<table border="1">
+<tr>
+{% for col in columns %}
+<th>{{ col }}</th>
+{% endfor %}
+</tr>
+{% for row in rows %}
+<tr>
+{% for cell in row %}
+<td>{{ cell }}</td>
+{% endfor %}
+</tr>
+{% endfor %}
+</table>
 {% endif %}
+<script>
+$(document).ready(function() {
+    let validHouseholdNumbers = [];
+
+    // Initialize table sorting
+    $('th').each(function() {
+        $(this).click(function() {
+            const table = $(this).closest('table');
+            const column = $(this).index();
+            
+            // Remove sort indicators from other headers
+            $(this).siblings().removeClass('asc desc');
+            
+            // Toggle sort direction
+            const isAsc = $(this).hasClass('asc') ? false : true;
+            $(this).toggleClass('asc desc', isAsc);
+            
+            // Get all rows except header
+            const rows = table.find('tr:not(:first)');
+            const sortedRows = rows.toArray().sort((a, b) => {
+                const aValue = $(a).find('td').eq(column).text();
+                const bValue = $(b).find('td').eq(column).text();
+                
+                // Handle numeric values differently
+                if (!$.isNumeric(aValue) || !$.isNumeric(bValue)) {
+                    return isAsc ? 
+                        aValue.localeCompare(bValue) :
+                        bValue.localeCompare(aValue);
+                }
+                
+                return isAsc ? 
+                    parseFloat(aValue) - parseFloat(bValue) :
+                    parseFloat(bValue) - parseFloat(aValue);
+            });
+            
+            // Reinsert sorted rows
+            $.each(sortedRows, function(index, row) {
+                table.append(row);
+            });
+        });
+    });
+
+    // Autocomplete functionality remains unchanged
+    $.ajax({
+        url: "/search-autocomplete",
+        data: {term: ''},
+        async: false,
+        success: function(data) {
+            validHouseholdNumbers = data;
+        }
+    });
+
+    $("#household-number").autocomplete({
+        source: function(request, response) {
+            const matches = validHouseholdNumbers.filter(num =>
+                num.toString().toLowerCase().includes(request.term.toLowerCase())
+            );
+            const formattedMatches = matches.map(num => ({
+                label: num.toString(),
+                value: num
+            }));
+            response(formattedMatches);
+        },
+        minLength: 1,
+        select: function(event, ui) {
+            event.preventDefault();
+            $(this).val(ui.item.value);
+        },
+        change: function(event, ui) {
+            if (!ui.item) {
+                $(this).val('');
+            }
+        }
+    });
+});
+</script>
+</body>
+</html>
