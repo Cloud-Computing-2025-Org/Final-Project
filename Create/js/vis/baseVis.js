@@ -42,18 +42,18 @@ export default class BaseVisualization {
     createLegend() {
         const legend = this.svg.append('g')
             .attr('class', 'legend')
-            .attr('transform', `translate(${this.width - 200}, ${this.margin.top})`);
+            .attr('transform', `translate(${this.innerWidth - 200}, ${this.margin.top})`);
 
         return legend;
     }
 
     createAxes(xAxisLabel = '', yAxisLabel = '') {
         // Create x-axis
-        const xAxis = d3.axisBottom(this.xScale);
+        this.xAxis = d3.axisBottom(this.xScale);
         this.plotGroup.append('g')
             .attr('class', 'x-axis')
             .attr('transform', `translate(0,${this.innerHeight})`)
-            .call(xAxis)
+            .call(this.xAxis)
             .append('text')
             .attr('class', 'axis-label')
             .attr('x', this.innerWidth / 2)
@@ -62,10 +62,10 @@ export default class BaseVisualization {
             .text(xAxisLabel);
 
         // Create y-axis
-        const yAxis = d3.axisLeft(this.yScale);
+        this.yAxis = d3.axisLeft(this.yScale);
         this.plotGroup.append('g')
             .attr('class', 'y-axis')
-            .call(yAxis)
+            .call(this.yAxis)
             .append('text')
             .attr('class', 'axis-label')
             .attr('transform', 'rotate(-90)')

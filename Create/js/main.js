@@ -59,7 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
         
         if (progress >= 90) {
             eventSource.close();
-            loadingText.textContent = `Pulling Data...`;
+            loadingText.textContent = `Pulling Data... (this is gonna take a good minute, dw it's cached after)`;
         }
     };
 

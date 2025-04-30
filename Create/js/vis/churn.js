@@ -11,12 +11,12 @@ export default class ChurnVisualization extends BaseVisualization {
         // Transform data for regression
         this.transformedData = this.data.map(d => ({
             x: Date.parse(parseDate(d.last_purchase_date)) / (1000 * 60 * 60 * 24),
-            y: d.HSD_NUM
+            y: parseFloat(d.HSD_NUM) || 0 // Ensure valid numbers
         }));
 
         // Calculate regression
         const regression = this.calculateRegression();
-        
+
         // Set domains based on regression
         this.xScale.domain(d3.extent(this.transformedData, d => d.x));
         this.yScale.domain(d3.extent(this.transformedData, d => d.y));
@@ -26,21 +26,21 @@ export default class ChurnVisualization extends BaseVisualization {
 
         // Add points
         this.plotPoints();
-        
+
         // Add regression line
         this.addRegressionLine(regression);
-        
+
         // Add prediction line
         this.addPredictionLine(regression);
 
         // Add title
-        this.createTitle("Churn Predicition")
+        this.createTitle("Churn Prediction");
     }
 
     calculateRegression() {
         const xValues = this.transformedData.map(d => d.x);
         const yValues = this.transformedData.map(d => d.y);
-
+        
         let sum_x = 0;
         let sum_y = 0;
         let sum_xy = 0;
@@ -56,11 +56,22 @@ export default class ChurnVisualization extends BaseVisualization {
 
         const slope = (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x);
         const intercept = (sum_y - slope * sum_x) / n;
-
+        
         return { slope, intercept };
     }
 
     plotPoints() {
+        // Clear existing circles
+        this.plotGroup.selectAll("circle").remove();
+    
+        // Update y-scale domain with padding for better visualization
+        const yExtent = d3.extent(this.transformedData, d => d.y);
+        const padding = (yExtent[1] - yExtent[0]) * 0.1; // 10% padding
+        this.yScale.domain([
+            yExtent[0] - padding,
+            yExtent[1] + padding
+        ]);
+    
         this.plotGroup.selectAll("circle")
             .data(this.transformedData)
             .enter()
@@ -88,6 +99,7 @@ export default class ChurnVisualization extends BaseVisualization {
     addPredictionLine(regression) {
         const futureDays = 30; // Predict next 30 days
         const lastDate = Math.max(...this.transformedData.map(d => d.x));
+        
         const predictionPoint = {
             x: lastDate + (futureDays * 24 * 60 * 60),
             y: regression.slope * (lastDate + (futureDays * 24 * 60 * 60)) + regression.intercept
