@@ -1,12 +1,32 @@
 # Moved routes to a separate module
 from flask import Blueprint, request, make_response, render_template, redirect, url_for, jsonify, Response, send_from_directory
-from sqlalchemy import text
+from sqlalchemy import text, inspect
 from models import db
 from decorators import require_cookie
 import time
 import pandas as pd
 
 routes = Blueprint('routes', __name__)
+
+# idk y, but checking this makes pulling data magically work again
+def check_database_tables():
+    inspector = inspect(db.engine)
+    
+    # Check if schema exists
+    schemas = inspector.get_schema_names()
+    print(f"Schemas found: {schemas}")
+    
+    # Check if table exists
+    tables = inspector.get_table_names(schema=None)
+    print(f"Tables found: {tables}")
+    
+    # Verify exact table name
+    if 'transactions' in tables:
+        print("Table exists with lowercase name")
+    elif 'Transactions' in tables:
+        print("Table exists with mixed case name")
+    else:
+        print("Table not found - consider running migrations")
 
 @routes.route("/register", methods=["GET", "POST"])
 def register():
@@ -58,6 +78,7 @@ def serve_static(filename):
 @routes.route("/dashboard_data")
 @require_cookie
 def dashboard_data():
+    check_database_tables()
     # Combine all queries into one JSON response
     queries = {
         "engagement": """
@@ -153,7 +174,7 @@ def dashboard_progress():
 
         for i, step in enumerate(progress_steps):
             # Simulate query execution time
-            time.sleep(0.5)  # Replace with actual query execution if needed
+            time.sleep(2)  # Replace with actual query execution if needed
             progress = int(((i + 1) / total_steps) * 100)
             yield f"data: {progress}\n\n"
 
